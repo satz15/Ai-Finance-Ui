@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState } from "reactAi-Finance-Ui";
 import { Upload, TrendingUp, AlertCircle, CheckCircle, DollarSign, PieChart, Activity } from "lucide-react";
 
 function App() {

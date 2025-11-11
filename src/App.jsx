@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Upload,
   TrendingUp,
@@ -11,16 +11,36 @@ import {
   Target,
   Shield,
   Zap,
+  Coins,
+  FileText,
+  TrendingDown,
+  Lightbulb,
+  LineChart as LineChartIcon,
 } from "lucide-react";
-import { PieChart as RechartsPie, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
+import {
+  PieChart as RechartsPie,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Legend,
+  Tooltip,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Line,
+  LineChart,
+} from "recharts";
+import FinancialChatBot from "./Components/FinancialChatBot";
 
 function App() {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState(null);
   const [error, setError] = useState(null);
-  const [dragActive, setDragActive] = useState(false);
   const [reportFile, setReportFile] = useState(null);
+  const [history, setHistory] = useState([]);
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -30,25 +50,20 @@ function App() {
     }
   };
 
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
+  const fetchHistory = async () => {
+    try {
+      const res = await fetch("http://127.0.0.1:8000/financial-history");
+      const data = await res.json();
+      console.log("📈 Updated History:", data.history);
+      setHistory(data.history || []);
+    } catch (error) {
+      console.error("Error fetching financial history:", error);
     }
   };
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0]);
-      setError(null);
-    }
-  };
+  useEffect(() => {
+    fetchHistory(); // initial load
+  }, []);
 
   const handleUpload = async () => {
     if (!file) return setError("Please select a file to analyze.");
@@ -65,15 +80,15 @@ function App() {
         body: formData,
       });
 
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
 
       const data = await res.json();
-      setReport(data.Financial_Report || data);
+      const result = data.Financial_Report || data;
+      setReport(result);
 
       if (data.Report_Available && data.Report_Name) {
         setReportFile(data.Report_Name);
+        await fetchHistory();
       }
     } catch (err) {
       console.error(err);
@@ -106,12 +121,13 @@ function App() {
     }
   };
 
-  // Prepare chart data
   const getChartData = () => {
     if (!report?.Financial_Overview) return null;
 
-    const income = parseFloat(report.Financial_Overview["Total Income (₹)"]) || 0;
-    const expenses = parseFloat(report.Financial_Overview["Total Expenses (₹)"]) || 0;
+    const income =
+      parseFloat(report.Financial_Overview["Total Income (₹)"]) || 0;
+    const expenses =
+      parseFloat(report.Financial_Overview["Total Expenses (₹)"]) || 0;
     const savings = parseFloat(report.Financial_Overview["Savings (₹)"]) || 0;
 
     return {
@@ -129,219 +145,168 @@ function App() {
 
   const chartData = getChartData();
 
+  const chartDataHistory =
+    history.length === 1
+      ? [...history, { ...history[0], month: "Next" }] // clone same month with new label
+      : history;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-blue-900 shadow-xl">
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="flex items-center gap-4">
-            <div className="bg-gradient-to-br from-amber-400 to-yellow-500 p-4 rounded-xl shadow-2xl">
-              <DollarSign className="w-10 h-10 text-blue-900" />
-            </div>
-            <div>
-              <h1 className="text-4xl font-bold text-white tracking-tight">
-                AI Financial Health Doctor
-              </h1>
-              <p className="text-blue-200 text-base mt-1 font-medium">
-                Professional financial analysis powered by AI
-              </p>
-            </div>
+      {/* Header with animated gradient */}
+      <div className="relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 shadow-2xl overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-10"></div>
+        <div className="max-w-7xl mx-auto px-6 py-10 flex items-center gap-5 relative z-10">
+          <div className="bg-gradient-to-br from-amber-400 via-yellow-400 to-orange-500 p-5 rounded-2xl shadow-2xl transform hover:scale-110 transition-transform duration-300">
+            <DollarSign className="w-12 h-12 text-white" strokeWidth={2.5} />
+          </div>
+          <div>
+            <h1 className="text-4xl font-black text-white tracking-tight drop-shadow-lg">
+              AI Financial Health Doctor
+            </h1>
+            <p className="text-blue-100 text-lg mt-2 font-semibold">
+              Professional financial analysis powered by advanced AI technology
+            </p>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-10">
-        {/* Upload Section */}
-        <div className="bg-white rounded-2xl shadow-xl p-10 mb-10 border border-gray-200">
-          <div
-            onDragEnter={handleDrag}
-            onDragLeave={handleDrag}
-            onDragOver={handleDrag}
-            onDrop={handleDrop}
-            className={`relative border-3 border-dashed rounded-xl p-16 transition-all duration-300 ${
-              dragActive
-                ? "border-blue-600 bg-blue-50 scale-105"
-                : "border-gray-300 bg-gray-50 hover:bg-blue-50/50 hover:border-blue-400"
-            }`}
-          >
-            <input
-              type="file"
-              accept=".csv,.pdf"
-              onChange={handleFileChange}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              id="file-upload"
-            />
-
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 mb-6 shadow-2xl">
-                <Upload className="w-12 h-12 text-white" />
-              </div>
-
-              {file ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-center gap-3 text-green-600">
-                    <CheckCircle className="w-6 h-6" />
-                    <span className="font-bold text-lg text-gray-900">{file.name}</span>
-                  </div>
-                  <p className="text-base text-gray-600">
-                    {(file.size / 1024).toFixed(2)} KB
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-2xl font-bold text-gray-900">
-                    Drop your financial file here
-                  </p>
-                  <p className="text-lg text-gray-600">
-                    or click to browse • Supports CSV and PDF files
-                  </p>
-                </div>
-              )}
+      <div className="max-w-7xl mx-auto px-6 py-12">
+        {/* Upload Section with modern design */}
+        <div className="bg-gradient-to-br from-white to-gray-50 rounded-3xl shadow-2xl p-12 mb-12 border-2 border-gray-200 backdrop-blur-sm">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full mb-4 shadow-lg">
+              <FileText className="w-10 h-10 text-white" />
             </div>
+            <h2 className="text-3xl font-bold text-gray-800 mb-2">
+              Upload Your Financial Data
+            </h2>
+            <p className="text-gray-600 text-lg">
+              Support for CSV and PDF formats
+            </p>
           </div>
+
+          <input
+            type="file"
+            accept=".csv,.pdf"
+            onChange={handleFileChange}
+            className="hidden"
+            id="file-upload"
+          />
+          <label
+            htmlFor="file-upload"
+            className="cursor-pointer block text-xl font-semibold text-blue-700 border-3 border-dashed border-blue-400 rounded-2xl py-8 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-xl"
+          >
+            <div className="flex items-center justify-center gap-3">
+              <Upload className="w-6 h-6" />
+              <span>
+                {file
+                  ? `${file.name}`
+                  : "Click to upload or drop your file here"}
+              </span>
+            </div>
+          </label>
 
           <button
             onClick={handleUpload}
             disabled={loading || !file}
-            className="w-full mt-8 bg-gradient-to-r from-blue-700 to-indigo-800 text-white px-10 py-5 rounded-xl font-bold text-xl shadow-lg hover:shadow-2xl hover:from-blue-800 hover:to-indigo-900 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all duration-300 flex items-center justify-center gap-4"
+            className="mt-8 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white px-12 py-5 rounded-2xl font-bold text-xl shadow-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-4 transform hover:scale-105 transition-all duration-300"
           >
             {loading ? (
               <>
                 <Activity className="w-6 h-6 animate-spin" />
-                Analyzing Your Finances...
+                <span>Analyzing Your Financial Data...</span>
               </>
             ) : (
               <>
                 <TrendingUp className="w-6 h-6" />
-                Analyze Financial Health
+                <span>Analyze Financial Health</span>
               </>
             )}
           </button>
         </div>
 
-        {/* Error Message */}
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-600 rounded-lg p-5 mb-10 flex items-start gap-4 shadow-lg">
-            <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-1" />
-            <p className="text-red-800 font-semibold text-lg">{error}</p>
+          <div className="bg-gradient-to-r from-red-50 to-rose-50 border-l-4 border-red-600 rounded-2xl p-6 mb-12 flex items-start gap-4 shadow-xl">
+            <AlertCircle className="w-7 h-7 text-red-600 flex-shrink-0 mt-1" />
+            <div>
+              <h3 className="text-red-900 font-bold text-xl mb-1">Error</h3>
+              <p className="text-red-800 font-medium text-lg">{error}</p>
+            </div>
           </div>
         )}
 
-        {/* Report Section */}
         {report && (
-          <div className="space-y-8 animate-fade-in">
+          <div className="space-y-12">
             {/* Financial Overview */}
-            <div className="bg-white rounded-2xl shadow-xl p-10 border border-gray-200">
-              <div className="flex items-center gap-4 mb-8">
-                <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-3 rounded-xl shadow-lg">
+            <div className="bg-gradient-to-br from-white to-blue-50 rounded-3xl shadow-2xl p-10 border-2 border-blue-200">
+              <div className="flex items-center gap-4 mb-8 pb-6 border-b-2 border-blue-200">
+                <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-4 rounded-xl shadow-lg">
                   <PieChart className="w-8 h-8 text-white" />
                 </div>
-                <h2 className="text-3xl font-bold text-gray-900">
+                <h2 className="text-4xl font-black text-gray-900">
                   Financial Overview
                 </h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
-                {Object.entries(report.Financial_Overview).map(([k, v]) => {
-                  const isIncome = k.includes("Income");
-                  const isExpense = k.includes("Expenses");
-                  const isSavings = k.includes("Savings");
-                  const isDebt = k.includes("Debt");
-                  
-                  let bgColor = "from-gray-50 to-gray-100";
-                  let borderColor = "border-gray-200";
-                  let textColor = "text-gray-900";
-                  
-                  if (isIncome) {
-                    bgColor = "from-blue-50 to-blue-100";
-                    borderColor = "border-blue-200";
-                    textColor = "text-blue-900";
-                  } else if (isExpense || isDebt) {
-                    bgColor = "from-red-50 to-red-100";
-                    borderColor = "border-red-200";
-                    textColor = "text-red-900";
-                  } else if (isSavings) {
-                    bgColor = "from-green-50 to-green-100";
-                    borderColor = "border-green-200";
-                    textColor = "text-green-900";
-                  }
-                  
-                  return (
-                    <div
-                      key={k}
-                      className={`bg-gradient-to-br ${bgColor} rounded-xl p-6 border-2 ${borderColor} hover:shadow-xl hover:scale-105 transition-all duration-300`}
-                    >
-                      <p className="text-sm text-gray-700 font-semibold mb-2 uppercase tracking-wide">
-                        {k.replaceAll("_", " ").replace("(₹)", "").replace("(%)", "")}
-                      </p>
-                      <p className={`text-3xl font-bold ${textColor}`}>{v}</p>
-                    </div>
-                  );
-                })}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+                {Object.entries(report.Financial_Overview).map(([k, v]) => (
+                  <div
+                    key={k}
+                    className="bg-gradient-to-br from-blue-100 via-indigo-100 to-purple-100 p-7 rounded-2xl border-2 border-blue-300 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+                  >
+                    <p className="text-sm text-gray-700 font-bold mb-2 uppercase tracking-wider">
+                      {k.replaceAll("_", " ")}
+                    </p>
+                    <p className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-indigo-900">
+                      {v}
+                    </p>
+                  </div>
+                ))}
               </div>
 
               {/* Charts */}
               {chartData && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
-                  {/* Pie Chart */}
-                  <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-6 border-2 border-slate-200 shadow-lg">
-                    <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                      <Target className="w-5 h-5 text-blue-700" />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <div className="bg-white p-8 rounded-2xl border-2 border-gray-200 shadow-lg">
+                    <h3 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-3">
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                       Expense vs Savings Breakdown
                     </h3>
                     <ResponsiveContainer width="100%" height={300}>
                       <RechartsPie>
                         <Pie
                           data={chartData.pieData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                          outerRadius={100}
-                          fill="#8884d8"
                           dataKey="value"
+                          outerRadius={110}
+                          label={({ name, percent }) =>
+                            `${name}: ${(percent * 100).toFixed(0)}%`
+                          }
+                          strokeWidth={2}
                         >
                           {chartData.pieData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
+                            <Cell key={index} fill={entry.color} />
                           ))}
                         </Pie>
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: "white",
-                            border: "2px solid #e5e7eb",
-                            borderRadius: "8px",
-                            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-                          }}
-                        />
-                        <Legend
-                          iconType="circle"
-                        />
+                        <Tooltip />
+                        <Legend />
                       </RechartsPie>
                     </ResponsiveContainer>
                   </div>
 
-                  {/* Bar Chart */}
-                  <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-6 border-2 border-slate-200 shadow-lg">
-                    <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                      <TrendingUp className="w-5 h-5 text-blue-700" />
-                      Financial Comparison
+                  <div className="bg-white p-8 rounded-2xl border-2 border-gray-200 shadow-lg">
+                    <h3 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-3">
+                      <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                      Income vs Expense vs Savings
                     </h3>
                     <ResponsiveContainer width="100%" height={300}>
                       <BarChart data={chartData.barData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                        <XAxis dataKey="name" stroke="#374151" />
-                        <YAxis stroke="#374151" />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: "white",
-                            border: "2px solid #e5e7eb",
-                            borderRadius: "8px",
-                            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-                          }}
-                        />
-                        <Bar dataKey="value" fill="#1e40af" radius={[8, 8, 0, 0]}>
+                        <XAxis dataKey="name" stroke="#6b7280" />
+                        <YAxis stroke="#6b7280" />
+                        <Tooltip />
+                        <Bar dataKey="value" radius={[8, 8, 0, 0]}>
                           {chartData.barData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
+                            <Cell key={index} fill={entry.color} />
                           ))}
                         </Bar>
                       </BarChart>
@@ -351,100 +316,432 @@ function App() {
               )}
             </div>
 
-            {/* AI Analysis */}
-            <div className="bg-white rounded-2xl shadow-xl p-10 border border-gray-200">
-              <div className="flex items-center gap-4 mb-8">
-                <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-3 rounded-xl shadow-lg">
-                  <Activity className="w-8 h-8 text-white" />
+            {/* AI Financial Analysis */}
+            {report.AI_Financial_Analysis && (
+              <div className="bg-gradient-to-br from-white to-indigo-50 rounded-3xl shadow-2xl p-10 border-2 border-indigo-200">
+                <div className="flex items-center gap-4 mb-8 pb-6 border-b-2 border-indigo-200">
+                  <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-4 rounded-xl shadow-lg">
+                    <Activity className="w-8 h-8 text-white" />
+                  </div>
+                  <h2 className="text-4xl font-black text-gray-900">
+                    AI Financial Analysis
+                  </h2>
                 </div>
-                <h2 className="text-3xl font-bold text-gray-900">
-                  AI Financial Analysis
-                </h2>
+
+                <div className="space-y-6">
+                  {Object.entries(report.AI_Financial_Analysis).map(
+                    ([section, content]) => {
+                      if (!content) return null;
+                      const Icon =
+                        section === "Summary"
+                          ? Shield
+                          : section === "Strengths"
+                          ? CheckCircle
+                          : section === "Areas_to_Improve"
+                          ? AlertCircle
+                          : section === "Strategies"
+                          ? Target
+                          : Activity;
+
+                      const colorClasses =
+                        section === "Strengths"
+                          ? "from-green-100 to-emerald-100 border-green-300"
+                          : section === "Areas_to_Improve"
+                          ? "from-orange-100 to-red-100 border-orange-300"
+                          : "from-indigo-100 to-purple-100 border-indigo-300";
+
+                      return (
+                        <div
+                          key={section}
+                          className={`bg-gradient-to-br ${colorClasses} p-8 rounded-2xl border-2 shadow-lg`}
+                        >
+                          <h3 className="text-2xl font-bold flex items-center gap-3 mb-4 text-gray-900">
+                            <Icon className="w-7 h-7 text-indigo-700" />
+                            {section.replaceAll("_", " ")}
+                          </h3>
+                          {Array.isArray(content) ? (
+                            <ul className="space-y-3 text-gray-800">
+                              {content.map((point, i) => (
+                                <li key={i} className="flex items-start gap-3">
+                                  <span className="inline-block w-2 h-2 bg-indigo-600 rounded-full mt-2 flex-shrink-0"></span>
+                                  <span className="text-lg leading-relaxed">
+                                    {point}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-gray-800 text-lg leading-relaxed">
+                              {content}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    }
+                  )}
+                </div>
               </div>
+            )}
 
-              <div className="space-y-6">
-                {Object.entries(report.AI_Financial_Analysis).map(
-                  ([section, content]) => {
-                    if (!content || (Array.isArray(content) && content.length === 0)) return null;
-                    
-                    const iconMap = {
-                      Summary: Shield,
-                      Strengths: CheckCircle,
-                      Areas_to_Improve: AlertCircle,
-                      Strategies: Target,
-                      Investment_Recommendations: TrendingUp,
-                      Expense_Optimization: Zap,
-                    };
-                    const Icon = iconMap[section] || Activity;
-                    
-                    const colorMap = {
-                      Summary: "from-blue-50 to-indigo-50 border-blue-200",
-                      Strengths: "from-green-50 to-emerald-50 border-green-200",
-                      Areas_to_Improve: "from-amber-50 to-orange-50 border-amber-200",
-                      Strategies: "from-purple-50 to-violet-50 border-purple-200",
-                      Investment_Recommendations: "from-cyan-50 to-sky-50 border-cyan-200",
-                      Expense_Optimization: "from-pink-50 to-rose-50 border-pink-200",
-                    };
-                    const colorClass = colorMap[section] || "from-gray-50 to-slate-50 border-gray-200";
-
-                    return (
-                      <div
-                        key={section}
-                        className={`bg-gradient-to-br ${colorClass} rounded-xl p-8 border-2 hover:shadow-xl transition-all duration-300`}
-                      >
-                        <h3 className="text-2xl font-bold text-gray-900 mb-5 flex items-center gap-3">
-                          <Icon className="w-6 h-6 text-blue-700" />
-                          {section.replaceAll("_", " ")}
-                        </h3>
-
-                        {Array.isArray(content) ? (
-                          <ul className="space-y-4">
-                            {content.map((point, i) => (
-                              <li
-                                key={i}
-                                className="flex items-start gap-4 text-gray-800 leading-relaxed text-base"
-                              >
-                                <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-1" />
-                                <span>{point}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-gray-800 leading-relaxed text-base">
-                            {content}
+            {/* Spending Reallocation */}
+            {/* {report.Spending_Reallocation && (
+              <div className="bg-gradient-to-br from-white to-amber-50 rounded-3xl shadow-2xl p-10 border-2 border-amber-200">
+                <div className="flex items-center gap-4 mb-8 pb-6 border-b-2 border-amber-200">
+                  <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-4 rounded-xl shadow-lg">
+                    <Coins className="w-8 h-8 text-white" />
+                  </div>
+                  <h2 className="text-4xl font-black text-gray-900">
+                    Spending Reallocation & Rewards Plan
+                  </h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {report.Spending_Reallocation.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-gradient-to-br from-yellow-100 via-amber-100 to-orange-100 border-2 border-amber-300 rounded-2xl p-7 shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
+                    >
+                      <h3 className="text-2xl font-black text-gray-900 mb-4 flex items-center gap-2">
+                        <TrendingDown className="w-6 h-6 text-amber-700" />
+                        {item.category}
+                      </h3>
+                      <div className="space-y-3">
+                        <div className="bg-white p-4 rounded-xl border border-amber-200">
+                          <p className="text-sm text-gray-600 font-semibold mb-1">
+                            Reduce Monthly
                           </p>
-                        )}
+                          <p className="text-2xl font-black text-amber-700">
+                            ₹{item.cut}
+                          </p>
+                        </div>
+                        <div className="bg-white p-4 rounded-xl border border-green-200">
+                          <p className="text-sm text-gray-600 font-semibold mb-1">
+                            3-Year Potential Growth
+                          </p>
+                          <p className="text-2xl font-black text-green-700">
+                            ₹{item.potential}
+                          </p>
+                        </div>
                       </div>
-                    );
-                  }
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )} */}
+            {report.Spending_Reallocation && (
+              <div className="bg-gradient-to-br from-white to-amber-50 rounded-3xl shadow-2xl p-10 border-2 border-amber-200">
+                <div className="flex items-center gap-4 mb-8 pb-6 border-b-2 border-amber-200">
+                  <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-4 rounded-xl shadow-lg">
+                    <Coins className="w-8 h-8 text-white" />
+                  </div>
+                  <h2 className="text-4xl font-black text-gray-900">
+                    Spending Reallocation & Rewards Plan
+                  </h2>
+                </div>
+
+                {/* 💰 Spending Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {report.Spending_Reallocation.filter(
+                    (item) => !item.insight
+                  ).map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-gradient-to-br from-yellow-100 via-amber-100 to-orange-100 border-2 border-amber-300 rounded-2xl p-7 shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
+                    >
+                      <h3 className="text-2xl font-black text-gray-900 mb-4 flex items-center gap-2">
+                        <TrendingDown className="w-6 h-6 text-amber-700" />
+                        {item.category}
+                      </h3>
+                      <div className="space-y-3">
+                        <div className="bg-white p-4 rounded-xl border border-amber-200">
+                          <p className="text-sm text-gray-600 font-semibold mb-1">
+                            Reduce Monthly
+                          </p>
+                          <p className="text-2xl font-black text-amber-700">
+                            ₹{item.cut}
+                          </p>
+                        </div>
+                        <div className="bg-white p-4 rounded-xl border border-green-200">
+                          <p className="text-sm text-gray-600 font-semibold mb-1">
+                            3-Year Potential Growth
+                          </p>
+                          <p className="text-2xl font-black text-green-700">
+                            ₹{item.potential}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 💬 Single Insights Card */}
+                {report.Spending_Reallocation.find((item) => item.insight) && (
+                  <div className="mt-10 bg-gradient-to-br from-amber-100 via-yellow-100 to-orange-100 border-2 border-amber-300 rounded-2xl p-8 shadow-lg">
+                    <h3 className="text-2xl font-black text-gray-900 mb-3 flex items-center gap-2">
+                      <Lightbulb className="w-6 h-6 text-amber-700" />
+                      Spending Insights
+                    </h3>
+                    <p className="text-gray-800 leading-relaxed text-lg font-medium">
+                      {
+                        report.Spending_Reallocation.find(
+                          (item) => item.insight
+                        )?.insight
+                      }
+                    </p>
+                  </div>
                 )}
               </div>
+            )}
 
-              {reportFile && (
-                <div className="text-center mt-10">
-                  <button
-                    onClick={handleDownload}
-                    className="inline-flex items-center gap-4 bg-gradient-to-r from-green-600 to-emerald-700 text-white px-10 py-5 rounded-xl font-bold text-xl shadow-lg hover:shadow-2xl hover:from-green-700 hover:to-emerald-800 transition-all duration-300"
-                  >
-                    <Download className="w-6 h-6" />
-                    Download Full Report (PDF)
-                  </button>
+            {Array.isArray(chartDataHistory) && chartDataHistory.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-xl p-10 border border-gray-200">
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="bg-gradient-to-br from-green-600 to-emerald-700 p-3 rounded-xl shadow-lg">
+                    <Activity className="w-8 h-8 text-white" />
+                  </div>
+                  <h2 className="text-3xl font-bold text-gray-900">
+                    Monthly Progress Tracker
+                  </h2>
                 </div>
-              )}
-            </div>
+
+                {/* ✅ FIX: set height={350} instead of "100%" */}
+                <ResponsiveContainer width="100%" height={380}>
+                  <LineChart
+                    data={chartDataHistory}
+                    margin={{ top: 30, right: 40, left: 10, bottom: 10 }}
+                  >
+                    <defs>
+                      <linearGradient
+                        id="colorIncome"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="#2563eb"
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#2563eb"
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                      <linearGradient
+                        id="colorExpenses"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="#dc2626"
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#dc2626"
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                      <linearGradient
+                        id="colorSavings"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="#16a34a"
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#16a34a"
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="month" stroke="#6b7280" tickMargin={10} />
+                    <YAxis
+                      stroke="#6b7280"
+                      tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
+                      domain={["auto", "auto"]}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#fff",
+                        borderRadius: "10px",
+                        border: "1px solid #ddd",
+                      }}
+                      formatter={(v) => `₹${v.toLocaleString()}`}
+                    />
+                    <Legend verticalAlign="top" height={36} />
+
+                    {/* Income */}
+                    <Line
+                      type="monotone"
+                      dataKey="income"
+                      stroke="#2563eb"
+                      strokeWidth={3}
+                      dot={{ r: 6, fill: "#2563eb" }}
+                      activeDot={{ r: 10, fill: "#2563eb" }}
+                      fill="url(#colorIncome)"
+                    />
+
+                    {/* Expenses */}
+                    <Line
+                      type="monotone"
+                      dataKey="expenses"
+                      stroke="#dc2626"
+                      strokeWidth={3}
+                      dot={{ r: 6, fill: "#dc2626" }}
+                      activeDot={{ r: 10, fill: "#dc2626" }}
+                      fill="url(#colorExpenses)"
+                    />
+
+                    {/* Savings */}
+                    <Line
+                      type="monotone"
+                      dataKey="savings"
+                      stroke="#16a34a"
+                      strokeWidth={3}
+                      dot={{ r: 6, fill: "#16a34a" }}
+                      activeDot={{ r: 10, fill: "#16a34a" }}
+                      fill="url(#colorSavings)"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+
+                {chartDataHistory.length === 1 && (
+                  <p className="text-center text-gray-500 italic mt-4">
+                    📈 Upload next month’s report to view your financial growth
+                    trend.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Goal-Based Financial Planning with enhanced progress bars */}
+            {report.Goal_Based_Plan && (
+              <div className="bg-gradient-to-br from-white to-green-50 rounded-3xl shadow-2xl p-10 border-2 border-green-200">
+                <div className="flex items-center gap-4 mb-8 pb-6 border-b-2 border-green-200">
+                  <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-4 rounded-xl shadow-lg">
+                    <Target className="w-8 h-8 text-white" />
+                  </div>
+                  <h2 className="text-4xl font-black text-gray-900">
+                    Goal-Based Financial Planning
+                  </h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {Object.entries(report.Goal_Based_Plan).map(
+                    ([goal, info]) => {
+                      const progress = Math.min(
+                        Math.round(
+                          (info.monthly_saving / info.target) *
+                            100 *
+                            info.months_to_reach
+                        ),
+                        100
+                      );
+
+                      return (
+                        <div
+                          key={goal}
+                          className="bg-gradient-to-br from-green-100 via-teal-100 to-cyan-100 border-2 border-green-300 rounded-2xl p-7 shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
+                        >
+                          <h3 className="text-2xl font-black text-gray-900 mb-5 flex items-center gap-2">
+                            <Zap className="w-6 h-6 text-green-700" />
+                            {goal}
+                          </h3>
+
+                          <div className="space-y-4 mb-5">
+                            <div className="bg-white p-4 rounded-xl border border-green-200">
+                              <p className="text-sm text-gray-600 font-semibold mb-1">
+                                🎯 Target Amount
+                              </p>
+                              <p className="text-2xl font-black text-green-700">
+                                ₹{info.target.toLocaleString()}
+                              </p>
+                            </div>
+
+                            <div className="bg-white p-4 rounded-xl border border-blue-200">
+                              <p className="text-sm text-gray-600 font-semibold mb-1">
+                                💰 Monthly Saving
+                              </p>
+                              <p className="text-2xl font-black text-blue-700">
+                                ₹{info.monthly_saving.toLocaleString()}
+                              </p>
+                            </div>
+
+                            <div className="bg-white p-4 rounded-xl border border-indigo-200">
+                              <p className="text-sm text-gray-600 font-semibold mb-1">
+                                ⏳ Months to Reach
+                              </p>
+                              <p className="text-2xl font-black text-indigo-700">
+                                {info.months_to_reach} months
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Enhanced Progress Bar */}
+                          <div className="mt-6">
+                            <div className="flex justify-between items-center mb-3">
+                              <span className="text-sm font-bold text-gray-700">
+                                Progress to Goal
+                              </span>
+                              <span className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-emerald-600">
+                                {progress}%
+                              </span>
+                            </div>
+                            <div className="relative w-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 rounded-full h-5 overflow-hidden shadow-inner border border-gray-300">
+                              <div
+                                className="absolute top-0 left-0 h-full bg-gradient-to-r from-green-400 via-emerald-500 to-green-600 rounded-full shadow-lg transition-all duration-1000 ease-out"
+                                style={{
+                                  width: `${progress}%`,
+                                }}
+                              >
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-40 animate-pulse"></div>
+                                <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white opacity-20"></div>
+                              </div>
+                            </div>
+                            <div className="mt-2 text-center">
+                              <span className="text-xs font-semibold text-gray-600">
+                                {progress < 100
+                                  ? `${100 - progress}% remaining`
+                                  : "Goal achievable!"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Download Report */}
+            {reportFile && (
+              <div className="text-center mt-12">
+                <button
+                  onClick={handleDownload}
+                  className="inline-flex items-center gap-4 bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 text-white px-14 py-6 rounded-2xl font-black text-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
+                >
+                  <Download className="w-8 h-8" />
+                  Download Full Report (PDF)
+                </button>
+              </div>
+            )}
+            <FinancialChatBot/>
           </div>
         )}
       </div>
-
-      <style>{`
-        @keyframes fade-in {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in {
-          animation: fade-in 0.6s ease-out;
-        }
-      `}</style>
     </div>
   );
 }
